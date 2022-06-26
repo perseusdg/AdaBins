@@ -1,3 +1,4 @@
+from typing import Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -38,7 +39,7 @@ class DecoderBN(nn.Module):
         self.conv3 = nn.Conv2d(features // 16, num_classes, kernel_size=3, stride=1, padding=1)
         # self.act_out = nn.Softmax(dim=1) if output_activation == 'softmax' else nn.Identity()
 
-    def forward(self, features):
+    def forward(self, features:list[torch.Tensor]):
         x_block0, x_block1, x_block2, x_block3, x_block4 = features[4], features[5], features[6], features[8], features[
             11]
 
@@ -65,9 +66,9 @@ class Encoder(nn.Module):
 
     def forward(self, x):
         features = [x]
-        for k, v in self.original_model._modules.items():
+        for k, v in self.original_model.named_children():
             if (k == 'blocks'):
-                for ki, vi in v._modules.items():
+                for ki, vi in v.named_children():
                     features.append(vi(features[-1]))
             else:
                 features.append(v(features[-1]))
@@ -89,8 +90,8 @@ class UnetAdaptiveBins(nn.Module):
         self.conv_out = nn.Sequential(nn.Conv2d(128, n_bins, kernel_size=1, stride=1, padding=0),
                                       nn.Softmax(dim=1))
 
-    def forward(self, x, **kwargs):
-        unet_out = self.decoder(self.encoder(x), **kwargs)
+    def forward(self, x):
+        unet_out = self.decoder(self.encoder(x))
         bin_widths_normed, range_attention_maps = self.adaptive_bins_layer(unet_out)
         out = self.conv_out(range_attention_maps)
 
